@@ -1,0 +1,36 @@
+---
+description: Incubyte salary MVP — scope, stack, and doc hierarchy
+alwaysApply: true
+---
+
+# Incubyte project context
+
+Salary Management MVP: replace ACME HR spreadsheets for ~10k employees.
+
+## Doc order (on conflict)
+
+1. `docs/scope.md` — boundary
+2. `docs/requirements.md` — FR/NFR tests
+3. `docs/spec.md` — implementation + status table
+4. `docs/erd.md` — schema
+
+Also read `AGENTS.md` at repo root.
+
+## Stack
+
+- `api/`: Bun.serve + bun:sqlite + bun test. No Express, no better-sqlite3.
+- `web/`: Vite + React + Vitest. Do not switch to Bun HTML imports.
+- Root: `bun install`, `bun run dev|test|lint|build|seed`.
+
+## Domain
+
+- Integer minor units for money; no floats.
+- Direct component edits in MVP — no audit log, no change reason.
+- Analytics USD conversion via `fx_rates` only; never mutate native stored amounts.
+- Component types from `salary_component_definitions` (runtime extensible).
+
+## Not in MVP
+
+Audit, approvals, RBAC, compensation events, CSV I/O, live FX, effective-dated history.
+
+Update `docs/spec.md` Implementation Status when completing a feature area.
