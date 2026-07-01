@@ -1,11 +1,17 @@
-import './App.css'
+import { Route, Routes } from "react-router-dom";
+import { Layout } from "@/components/Layout";
+import { DashboardPage } from "@/pages/DashboardPage";
+import { DirectoryPage } from "@/pages/DirectoryPage";
+import { EmployeePage } from "@/pages/EmployeePage";
 
-function App() {
+export default function App() {
   return (
-    <main className="app">
-      <h1>Incubyte</h1>
-    </main>
-  )
+    <Layout>
+      <Routes>
+        <Route path="/" element={<DirectoryPage />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/employees/:employeeId" element={<EmployeePage />} />
+      </Routes>
+    </Layout>
+  );
 }
-
-export default App
