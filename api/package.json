@@ -7,11 +7,13 @@
     "dev": "bun --watch src/index.ts",
     "build": "bun build src/index.ts --outdir dist --target bun",
     "start": "bun dist/index.js",
+    "seed": "bun src/seed-cli.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit"
   },
   "devDependencies": {
+    "@faker-js/faker": "^10.1.0",
     "@types/bun": "latest",
     "typescript": "^5"
   }
