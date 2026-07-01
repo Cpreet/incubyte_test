@@ -19,9 +19,9 @@ Use this section to see what exists in the repo today versus what remains to bui
 | Runtime component definitions | Done | `salary_component_definitions` |
 | Analytics API | Not started | FR-7–FR-11 in `docs/requirements.md` |
 | Domain unit layer | Not started | Pure functions for annualization, stats, FX |
-| Web employee directory UI | Not started | Shell only in `web/src/App.tsx` |
-| Web employee detail + edit UI | Not started | |
-| Web pay dashboard UI | Not started | |
+| Web employee directory UI | Done | `web/src/pages/DirectoryPage.tsx`, filters/pagination in URL query string |
+| Web employee detail + edit UI | Done | `web/src/pages/EmployeePage.tsx`, amount edit dialog + add component form |
+| Web pay dashboard UI | Done | `web/src/pages/DashboardPage.tsx`, breakdown/distribution/band-placement panels |
 
 When implementation and this table disagree, update this table in the same change set.
 
