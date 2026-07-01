@@ -1,5 +1,12 @@
 import type { AppDatabase } from "./db";
 import { openDatabase } from "./db";
+import {
+  getAnalyticsBandPlacement,
+  getAnalyticsBreakdown,
+  getAnalyticsDistribution,
+  getAnalyticsSummary,
+} from "./analytics";
+import { annualizeComponent } from "./domain/money";
 
 type EmployeePayload = {
   employeeId?: string;
@@ -74,6 +81,38 @@ export async function handleRequest(request: Request, db = getDefaultDatabase())
       return await withJsonBody<ComponentDefinitionPayload>(request, (body) => {
         return json(createComponentDefinition(db, body), 201);
       });
+    }
+
+    if (request.method === "GET" && url.pathname === "/analytics/summary") {
+      return json(getAnalyticsSummary(db));
+    }
+
+    if (request.method === "GET" && url.pathname === "/analytics/breakdown") {
+      const dimension = url.searchParams.get("dimension");
+      if (!dimension || !["job", "level", "location", "org_unit"].includes(dimension)) {
+        throw new HttpError(400, "dimension must be job, level, location, or org_unit");
+      }
+
+      return json(getAnalyticsBreakdown(db, dimension as "job" | "level" | "location" | "org_unit"));
+    }
+
+    if (request.method === "GET" && url.pathname === "/analytics/distribution") {
+      const job = url.searchParams.get("job");
+      const location = url.searchParams.get("location");
+      if (!job || !location) {
+        throw new HttpError(400, "job and location are required");
+      }
+
+      return json(getAnalyticsDistribution(db, job, location));
+    }
+
+    if (request.method === "GET" && url.pathname === "/analytics/band-placement") {
+      const job = url.searchParams.get("job");
+      if (!job) {
+        throw new HttpError(400, "job is required");
+      }
+
+      return json(getAnalyticsBandPlacement(db, job));
     }
 
     if (segments[0] === "employees" && segments[1]) {
@@ -308,15 +347,23 @@ function createComponentDefinition(db: AppDatabase, body: ComponentDefinitionPay
   const code = normalizeComponentCode(body.code);
   const now = new Date().toISOString();
 
-  return db
-    .query(
-      `
-        INSERT INTO salary_component_definitions (code, name, description, created_at)
-        VALUES (?, ?, ?, ?)
-        RETURNING code, name, description, created_at AS createdAt
-      `,
-    )
-    .get(code, body.name.trim(), body.description?.trim() || null, now);
+  try {
+    return db
+      .query(
+        `
+          INSERT INTO salary_component_definitions (code, name, description, created_at)
+          VALUES (?, ?, ?, ?)
+          RETURNING code, name, description, created_at AS createdAt
+        `,
+      )
+      .get(code, body.name.trim(), body.description?.trim() || null, now);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("UNIQUE constraint failed")) {
+      throw new HttpError(400, "component definition already exists");
+    }
+
+    throw error;
+  }
 }
 
 function findOrCreateLocation(db: AppDatabase, name: string, country: string, currency: string) {
@@ -418,7 +465,7 @@ function getCompensation(db: AppDatabase, employeeId: string) {
     )
     .all(compensationPackage.id) as Array<{ amount: number; frequency: string }>;
 
-  const annualizedTotal = components.reduce((total, component) => total + annualize(component), 0);
+  const annualizedTotal = components.reduce((total, component) => total + annualizeComponent(component), 0);
   return { employeeId: employee.employeeId, package: compensationPackage, components, annualizedTotal };
 }
 
@@ -436,6 +483,13 @@ function createComponent(db: AppDatabase, employeeId: string, body: ComponentPay
 function updateComponentAmount(db: AppDatabase, componentId: number, body: { amount?: number }) {
   if (body.amount === undefined || !Number.isInteger(body.amount) || body.amount < 0) {
     throw new HttpError(400, "amount must be a non-negative integer");
+  }
+
+  const existing = db
+    .query("SELECT id FROM salary_components WHERE id = ?")
+    .get(componentId) as { id: number } | undefined;
+  if (!existing) {
+    return undefined;
   }
 
   const newAmount = body.amount;
@@ -465,23 +519,23 @@ function insertComponent(db: AppDatabase, packageId: number, component: Componen
 
   const type = normalizeComponentCode(component.type);
 
-  return db
-    .query(
-      `
-        INSERT INTO salary_components (package_id, type, amount, currency, frequency, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        RETURNING id, type, amount, currency, frequency
-      `,
-    )
-    .get(packageId, type, component.amount, component.currency, component.frequency, now, now);
-}
+  try {
+    return db
+      .query(
+        `
+          INSERT INTO salary_components (package_id, type, amount, currency, frequency, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+          RETURNING id, type, amount, currency, frequency
+        `,
+      )
+      .get(packageId, type, component.amount, component.currency, component.frequency, now, now);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("FOREIGN KEY constraint failed")) {
+      throw new HttpError(400, "unknown component type");
+    }
 
-function annualize(component: { amount: number; frequency: string }) {
-  if (component.frequency === "monthly") {
-    return component.amount * 12;
+    throw error;
   }
-
-  return component.amount;
 }
 
 function nextEmployeeId(db: AppDatabase) {
