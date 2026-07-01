@@ -1,6 +1,6 @@
 # Salary Management — Scope
 
-**Companion docs:** `REQUIREMENTS.md` (what, and how it's verified) and `SPEC.md` (how it's built). This document owns the boundary: what the MVP does, what it deliberately doesn't, and the assumptions it stands on. When someone asks "is X in scope?", the answer is here.
+**Companion docs:** `docs/requirements.md` (what, and how it's verified) and `docs/spec.md` (how it's built). This document owns the boundary: what the MVP does, what it deliberately doesn't, and the assumptions it stands on. When someone asks "is X in scope?", the answer is here.
 
 ## Context
 
@@ -101,7 +101,7 @@ These are category boundaries, not deferred features. They stay out even post-MV
 - Deployed, working web app: directory, employee detail with direct component editing, and a pay dashboard.
 - Seed script for 10,000 deterministic employees.
 - Test suite: domain unit tests, API tests, schema tests.
-- Documents: this scope, `REQUIREMENTS.md`, `SPEC.md`, and the domain research.
+- Documents: this scope, `docs/requirements.md`, `docs/spec.md`, `docs/erd.md`, and the domain research under `docs/research/`.
 - A short demo video walking the directory, a salary component edit, and the dashboard answering a pay question.
 - Incremental commit history showing how the solution evolved.
 
