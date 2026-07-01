@@ -4,6 +4,27 @@ This spec describes the current MVP implementation target. It is aligned with `d
 
 The MVP is deliberately not a full compensation workflow engine. It models the static salary structure, supports direct compensation data management, and leaves events, approvals, audit logs, market feeds, budgeting, RBAC, and effective-dated history out of scope.
 
+## Implementation Status
+
+Use this section to see what exists in the repo today versus what remains to build.
+
+| Area | Status | Notes |
+|---|---|---|
+| SQLite schema + indexes | Done | `api/src/db.ts` |
+| Deterministic 10k seed | Done | `api/src/seed.ts`, Faker seed `20260701` |
+| Employee directory API | Done | Pagination, filters, search |
+| Employee CRUD API | Done | Create, read, update, delete |
+| Compensation read API | Done | Package + annualized total |
+| Component CRUD API | Done | Direct amount edit, create, delete |
+| Runtime component definitions | Done | `salary_component_definitions` |
+| Analytics API | Not started | FR-7–FR-11 in `docs/requirements.md` |
+| Domain unit layer | Not started | Pure functions for annualization, stats, FX |
+| Web employee directory UI | Not started | Shell only in `web/src/App.tsx` |
+| Web employee detail + edit UI | Not started | |
+| Web pay dashboard UI | Not started | |
+
+When implementation and this table disagree, update this table in the same change set.
+
 ## Objective
 
 Build a web application that replaces ACME's salary spreadsheets for 10,000 employees across multiple countries.
@@ -216,6 +237,73 @@ Example:
 
 After creation, `commission` can be used as a `salary_components.type`.
 
+## Analytics API (planned)
+
+Analytics endpoints are required by `docs/scope.md` and `docs/requirements.md` (FR-7–FR-11) but are not implemented yet. Add them in `api/src/` with pure domain helpers that unit tests can run without a database.
+
+Suggested surface:
+
+```text
+GET /analytics/summary
+GET /analytics/breakdown?dimension=job|level|location|org_unit
+GET /analytics/distribution?job=&location=
+GET /analytics/band-placement?job=
+```
+
+### Summary (`GET /analytics/summary`)
+
+Returns for the active employee population:
+
+- `headcount`
+- `totalAnnualizedCompUsd`
+- `meanAnnualizedCompUsd`
+- `medianAnnualizedCompUsd`
+
+Use base salary components only for band placement elsewhere; summary totals use full annualized package comp converted to USD via `fx_rates`.
+
+### Breakdown (`GET /analytics/breakdown`)
+
+Query param `dimension` is one of `job`, `level`, `location`, `org_unit`.
+
+Per group return:
+
+- `key` (dimension value)
+- `count`
+- `totalAnnualizedCompUsd`
+- `meanAnnualizedCompUsd`
+- `medianAnnualizedCompUsd`
+
+Omit groups with zero employees.
+
+### Distribution (`GET /analytics/distribution`)
+
+Requires `job` and `location`. Returns `min`, `p25`, `median`, `p75`, `max` of annualized total comp in USD for matching employees. Percentiles use linear interpolation between closest ranks.
+
+### Band placement (`GET /analytics/band-placement`)
+
+Requires `job`. Classify each active employee's **base** component against `pay_ranges` for their job, location, and level:
+
+- `below`, `within`, `above` (boundaries inclusive)
+- `no_band` for employees whose job/location/level has no pay range row
+
+Return counts and percentages per bucket.
+
+### Currency rules
+
+- Store and return native amounts unchanged.
+- Convert to USD only inside analytics using `fx_rates.rate_to_usd`.
+- Missing FX rate for a currency must error, not default to 1.
+
+## Frontend (planned)
+
+The `web` package is a Vite + React app. Target screens:
+
+1. **Directory** — paginated employee list with job, location, org unit, level filters and name search. Default page size 50.
+2. **Employee detail** — compensation package breakdown, inline component amount edit, add component, runtime type picker fed by `/component-definitions`.
+3. **Pay dashboard** — summary cards plus breakdown, distribution, and band-placement views backed by the analytics API.
+
+Configure the dev proxy so browser calls reach the API at `http://localhost:8787` (or `PORT`).
+
 ## Seed Data
 
 The seed script must populate exactly 10,000 employees by default:
@@ -238,13 +326,23 @@ Seed properties:
 
 ## Testing Expectations
 
+Test design is specified in `docs/tests/api-test-spec.md`. Testing agent process: `docs/testing-agent.md`.
+
 Current test layers:
 
-- API tests use in-memory SQLite via `openDatabase(":memory:")`.
-- Web tests use Vitest and Testing Library.
-- Type checking is run through workspace `lint` scripts.
+- API tests use in-memory SQLite via `openDatabase(":memory:")` and `bun test` in `api/`.
+- Web tests use Vitest and Testing Library in `web/`.
+- Type checking: `tsc --noEmit` in `api/`, ESLint + `tsc -b` in `web/`.
+- Root `bun run lint` and `bun run test` run both workspaces.
 
-Required verification:
+Planned additions:
+
+- `api/src/domain/` pure functions with `bun test` and no DB dependency (NFR-2).
+- Schema/index assertion tests for NFR-1.
+- API tests for analytics routes once implemented.
+- Component tests for directory, detail, and dashboard once UI exists.
+
+Required verification before calling the MVP done:
 
 ```bash
 bun run test
@@ -262,15 +360,25 @@ API tests should cover:
 - Component amount update.
 - Component create/delete.
 - Runtime component definition creation and use.
+- Analytics summary, breakdown, distribution, and band placement (once implemented).
+
+Domain unit tests should cover:
+
+- Annualization and package totals.
+- Mean, median, percentiles.
+- Band classification and `no_band` handling.
+- FX conversion, identity, and missing-rate errors.
 
 ## Implementation Notes
 
-- Keep unit/domain logic testable without binding a server port.
+- Keep unit/domain logic in `api/src/domain/` testable without binding a server port or opening SQLite.
+- Keep HTTP wiring in `api/src/server.ts` thin; call domain helpers from route handlers.
 - Keep SQLite FK constraints enabled with `PRAGMA foreign_keys = ON`.
-- Do not reintroduce an audit table unless scope changes.
+- Do not add an audit table unless scope changes in `docs/scope.md`.
 - Do not add compensation events or approval states until the operational layer is explicitly brought into scope.
 - Prefer explicit schema constraints for currencies, frequencies, non-negative amounts, and FK relationships.
-- Preserve native component/package currency in storage; conversion belongs to analytics.
+- Preserve native component/package currency in storage; conversion belongs to analytics only.
+- Use integer minor units everywhere money is stored or transmitted.
 
 ## Future Extension Points
 
