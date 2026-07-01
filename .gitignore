@@ -30,7 +30,11 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # caches
 .eslintcache
 .cache
+.netlify
 *.tsbuildinfo
+
+# local deployment helpers
+scripts/
 
 # IntelliJ based IDEs
 .idea

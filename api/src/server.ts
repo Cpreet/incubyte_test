@@ -61,6 +61,10 @@ export async function handleRequest(request: Request, db = getDefaultDatabase())
   const segments = url.pathname.split("/").filter(Boolean);
 
   try {
+    if (request.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: corsHeaders() });
+    }
+
     if (url.pathname === "/health") {
       return json({ ok: true, service: "api" });
     }
@@ -171,9 +175,14 @@ export async function handleRequest(request: Request, db = getDefaultDatabase())
   }
 }
 
-export function createServer(port = Number(process.env.PORT ?? 8787), db = getDefaultDatabase()) {
+export function createServer(
+  port = Number(process.env.PORT ?? 8787),
+  db = getDefaultDatabase(),
+  hostname = process.env.HOST,
+) {
   return Bun.serve({
     port,
+    hostname,
     fetch: (request) => handleRequest(request, db),
   });
 }
@@ -574,7 +583,15 @@ function normalizeComponentCode(code: string) {
 }
 
 function json(payload: unknown, status = 200) {
-  return Response.json(payload, { status });
+  return Response.json(payload, { status, headers: corsHeaders() });
+}
+
+function corsHeaders() {
+  return {
+    "Access-Control-Allow-Origin": process.env.CORS_ORIGIN ?? "*",
+    "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
 }
 
 class HttpError extends Error {
